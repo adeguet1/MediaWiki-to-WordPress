@@ -32,7 +32,7 @@ my $medurl = $url . '/wordpress/wp-content/uploads/bin';
 #
 sub init(){
 	use Getopt::Std;
-	my $opt_string = 'hvVrif:o:u:';
+	my $opt_string = 'hvVrif:o:u:I:M:';
 	getopts( "$opt_string", \%opt ) or usage();
 	if($opt{V}){
 		print $version."\n";
@@ -46,6 +46,12 @@ sub init(){
 	}
 	if($opt{i}){
 		$listimages = 1;
+	}
+	if($opt{I}){
+		$imgurl = $url.$opt{I};
+	}
+	if($opt{M}){
+		$medurl = $url.$opt{M} ;
 	}
 	usage() if $opt{h};
 	usage() if !$opt{f};
@@ -69,10 +75,11 @@ exit;
 }
 
 sub pageSlug(){
-	my $name = lc(shift());
-	$name =~ s/[^\w]/_/g;
-	$name =~ s/ /_/g;
-	return $name;
+    my $name = lc(shift());
+    $name =~ s/\s+$//;
+    $name =~ s/[^\w]/_/g;
+    $name =~ s/ /_/g;
+    return $name;
 }
 
 sub ctime(){
@@ -141,26 +148,47 @@ sub main(){
 		$content_temp = $new_content_temp;
 		
 		# Code for handling bullets
-		my $inUL = 0;
+		my $pastBulletLevel = 0;
+		my $currentBulletLevel = 0;
 		$new_content_temp = "";
 		@lines = split /\n/, $content_temp;
 		foreach my $line (@lines) {
-			if ( ($line =~ m/^\*/) && ($inUL == 0) ) {
-				# Entering UL
-				$line =~ s/^\*//;
-				$line = "<ul>\n<li>" . $line . "</li>";
-				$inUL = 1;
-			} elsif (($line =~ m/^\*/) && ($inUL == 1)) { 
-				# Inside UL
-				$line =~ s/^\*//;
-				$line = "<li>" . $line . "</li>";
-			} elsif ( ($line !~ m/^\*/) && ($inUL == 1) ) {
-				# leaving UL
-				$line = $line . "</ul>\n";
-				$inUL = 0;
+		    if ($line =~ m/^\*/) {
+			# Find current level of nested bullets and remove heading stars
+			$currentBulletLevel = 0;
+			while ($line =~ m/^\*/) {
+			    $currentBulletLevel += 1;
+			    $line =~ s/^\*//;
+			}
+			# Open lists
+			while ($currentBulletLevel > $pastBulletLevel) {
+			    # Entering UL
+			    $new_content_temp = $new_content_temp . "<ul>\n";
+			    $pastBulletLevel += 1;
+			}
+			while ($currentBulletLevel < $pastBulletLevel) {
+			    # Leaving UL
+			    $new_content_temp = $new_content_temp . "</ul>\n";
+			    $pastBulletLevel -= 1;
+			}
+			$new_content_temp = $new_content_temp . "<li>" . $line . "\n";
+		    } else {
+			# close bullets at end of list
+			while ($pastBulletLevel > 0) {
+			    # Leaving UL
+			    $new_content_temp = $new_content_temp . "</ul>\n";
+			    $pastBulletLevel -= 1;
 			}
 			$new_content_temp = $new_content_temp . $line . "\n";
+		    }
 		}
+		# close bullets at end of page
+		while ($pastBulletLevel > 0) {
+		    # Leaving UL
+		    $new_content_temp = $new_content_temp . "</ul>\n";
+		    $pastBulletLevel -= 1;
+		}
+
 		$content_temp = $new_content_temp;
 		
 		# Parse for [[Category - delete
@@ -174,10 +202,10 @@ sub main(){
 		$content_temp =~ s/\[{2}MediaWiki(.*?)\]{2}/<b>FIXME_MediaWiki $1<\/b>/g;
 		
 		# Parse for [[Media - make simple hyperlinks
-		$content_temp =~ s/\[{2}Media:(.*?)\|(.*?)\]{2}/<a href=\"$medurl\/$1\">$2<\/a>/g;
-		$content_temp =~ s/\[{2}Media:(.*?)\]{2}/<a href=\"$medurl\/$1\">$1<\/a>/g;
-		
-		# Parse for [[File - look like images (i.e., contain PNG/JPG. 
+		$content_temp =~ s/\[{2}[Mm]edia:(.*?)\|(.*?)\]{2}/<a href=\"$medurl\/$1\">$2<\/a>/g;
+		$content_temp =~ s/\[{2}[Mm]edia:(.*?)\]{2}/<a href=\"$medurl\/$1\">$1<\/a>/g;
+
+		# Parse for [[File - look like images (i.e., contain PNG/JPG.
 		$content_temp =~ s/\[{2}File:(.*?)([Pp][Nn][Gg])(.*?)\]{2}/[[Image:$1$2$3]]/g;
 		$content_temp =~ s/\[{2}File:(.*?)([Jj][Pp][Gg])(.*?)\]{2}/[[Image:$1$2$3]]/g;
 		
@@ -226,8 +254,8 @@ sub main(){
 			my $wd = 0;
 			my $at = "";
 			my $imstr = "";
-			my @dt = split('-', &ctime($page_i->{revision}{timestamp})); # date
-			
+			# my @dt = split('-', &ctime($page_i->{revision}{timestamp})); # date
+
 			# loop through all vars looking for one with "px"
 			for (my $i=1; $i<scalar(@img); $i++) {
 				# pixel size of image
@@ -241,7 +269,8 @@ sub main(){
 				}
 			}
 			# form string with tags we have.
-			$imstr = "<a href=\"" . $imgurl . "/" . $dt[0] . "/" . $dt[1] . "/". $fn . "\"><img src=\"" . $imgurl . "/" . $dt[0] . "/" . $dt[1] . "/". $fn . "\"";
+			# $imstr = "<a href=\"" . $imgurl . "/" . $dt[0] . "/" . $dt[1] . "/". $fn . "\"><img src=\"" . $imgurl . "/" . $dt[0] . "/" . $dt[1] . "/". $fn . "\"";
+			$imstr = "<a href=\"" . $imgurl . "/". $fn . "\"><img src=\"" . $imgurl . "/". $fn . "\"";
 			if ($wd > 0) {$imstr = $imstr . " width=\"" . $wd . "\"";}
 			if ($at ne "") {$imstr = $imstr . " alt=\"" . $at . "\"";}
 			$imstr = $imstr . " class=\"aligncenter\"></a>";
@@ -250,8 +279,8 @@ sub main(){
 			
 			# if requested print a list of shell commands to move images
 			if ($listimages > 0) {
-				print STDERR "mv `find . -iname '$fn'`  '../" . $dt[0] . "/" . $dt[1] . "/". $fn . "'\n";
-				#print STDERR "$fn\n";
+				# print STDERR "mv `find . -iname '$fn'`  '../" . $dt[0] . "/" . $dt[1] . "/". $fn . "'\n";
+				print STDERR "$fn\n";
 			}
 		}
 		
