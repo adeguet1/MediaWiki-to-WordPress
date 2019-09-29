@@ -33,7 +33,7 @@ If you decide to add more features, you're welcome to submit a pull request to t
 ### How to get the code
 ```sh
 git clone https://github.com/m1geo/MediaWiki-to-WordPress
-apt install libxml-smart-perl 
+sudo apt install libxml-smart-perl 
 sudo apt install libxml-rss-perl 
 ```
 
