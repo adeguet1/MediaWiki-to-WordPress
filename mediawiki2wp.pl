@@ -171,7 +171,7 @@ sub main(){
 			    $new_content_temp = $new_content_temp . "</ul>\n";
 			    $pastBulletLevel -= 1;
 			}
-			$new_content_temp = $new_content_temp . "<li>" . $line . "\n";
+			$new_content_temp = $new_content_temp . "<li>" . $line . "</li>\n";
 		    } else {
 			# close bullets at end of list
 			while ($pastBulletLevel > 0) {
